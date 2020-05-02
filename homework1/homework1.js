@@ -3,7 +3,7 @@
 var canvas;
 var gl;
 
-var numVertices = 178; //172
+var numVertices = 178;
 
 var numChecks = 8;
 
@@ -16,7 +16,7 @@ var flag = true;
 var pointsArray = [];
 var colorsArray = [];
 
-
+//Rotation
 var xAxis = 0;
 var yAxis = 1;
 var zAxis = 2;
@@ -25,8 +25,28 @@ var axis = 0;
 var stopRotation = true;
 var direction = 1;
 var theta = [0, 0, 0];
-
 var thetaLoc;
+
+//Viewer position
+// var x = 0.0;
+// var y = 0.0;
+// var z = 4.0;
+
+var near = 2.21;
+var far = 6.0;
+var x = 0.0;
+var y = 0.0;
+var z = 4.8;
+var dr = 5.0 * Math.PI / 180.0;
+
+var fovy = 90.0;  // Field-of-view in Y direction angle (in degrees)
+var aspect = 1.5;       // Viewport aspect ratio
+
+var modelViewMatrix, projectionMatrix;
+var modelViewMatrixLoc, projectionMatrixLoc;
+var eye;
+const at = vec3(0.0, 0.0, 0.0);
+const up = vec3(0.0, 1.0, 0.0);
 
 var vertices = [
   vec4(-0.4, -0.5, 0.4, 1.0),   //0
@@ -90,7 +110,7 @@ function quad(a, b, c, d) {
   } else {
     color = vertexColors[a];
   }
-  
+
   pointsArray.push(vertices[a]);
   colorsArray.push(color);
 
@@ -122,7 +142,7 @@ function colorCube() {
   quad(3, 21, 24, 7);
   quad(7, 24, 23, 4);
   quad(4, 23, 20, 0);
-  
+
   // quad(6, 5, 1, 2);
   //Top-up face
   quad(1, 2, 11, 8);
@@ -142,10 +162,10 @@ function colorCube() {
   quad(0, 25, 26, 1);
   quad(2, 1, 26, 27);
   quad(3, 2, 27, 28);
-  quad(0,3,28,25);
+  quad(0, 3, 28, 25);
   quad(28, 27, 25, 25);
   quad(25, 27, 26, 26);
-  
+
   //Base
   quad(9, 8, 11, 10);
   quad(10, 11, 15, 14);
@@ -174,6 +194,9 @@ window.onload = function init() {
   if (!gl) alert("WebGL 2.0 isn't available");
 
   gl.viewport(0, 0, canvas.width, canvas.height);
+
+  this.aspect = this.canvas.width / this.canvas.height;
+
   gl.clearColor(1.0, 1.0, 1.0, 1.0);
 
   gl.enable(gl.DEPTH_TEST);
@@ -190,22 +213,24 @@ window.onload = function init() {
   gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, flatten(colorsArray), gl.STATIC_DRAW);
 
-  var vColor = gl.getAttribLocation(program, "aColor");
-  gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(vColor);
+  var colorLoc = gl.getAttribLocation(program, "aColor");
+  gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(colorLoc);
 
   var vBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, flatten(pointsArray), gl.STATIC_DRAW);
 
-  var vPosition = gl.getAttribLocation(program, "aPosition");
-  gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(vPosition);
+  var positionLoc = gl.getAttribLocation(program, "aPosition");
+  gl.vertexAttribPointer(positionLoc, 4, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(positionLoc);
+
+  modelViewMatrixLoc = gl.getUniformLocation(program, "uModelViewMatrix");
+  projectionMatrixLoc = gl.getUniformLocation(program, "uProjectionMatrix");
 
   thetaLoc = gl.getUniformLocation(program, "uTheta");
 
   //event listeners for buttons
-
   document.getElementById("xButton").onclick = function () {
     axis = xAxis;
     stopRotation = !stopRotation;
@@ -224,16 +249,47 @@ window.onload = function init() {
   document.getElementById("directionButton").onclick = function () {
     direction *= -1;
   };
+
+  // sliders for viewing parameters
+  document.getElementById("zFarSlider").onchange = function (event) {
+    far = event.target.value;
+  };
+  document.getElementById("zNearSlider").onchange = function (event) {
+    near = event.target.value;
+  };
+  document.getElementById("xSlider").onchange = function (event) {
+    x = event.target.value;
+  };
+  document.getElementById("ySlider").onchange = function (event) {
+    y = event.target.value;
+  };
+  document.getElementById("zSlider").onchange = function (event) {
+    z = event.target.value;
+  };
+  document.getElementById("aspectSlider").onchange = function (event) {
+    aspect = event.target.value;
+  };
+  document.getElementById("fovSlider").onchange = function (event) {
+    fovy = event.target.value;
+  };
+
   render();
 }
 
 var render = function () {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  
+
   if (!stopRotation) {
-    theta[axis] += direction*.9;
+    theta[axis] += direction * .9;
   }
-  
+
+  eye = vec3(x,y,z);
+  modelViewMatrix = lookAt(eye, at, up);
+  projectionMatrix = perspective(fovy, aspect, near, far);
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
+  gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
+
   gl.uniform3fv(thetaLoc, theta);
 
   gl.drawArrays(gl.TRIANGLES, 0, numVertices);

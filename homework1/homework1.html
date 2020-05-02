@@ -4,7 +4,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
   <title>Homework 1</title>
-    
+
   <script id="vertex-shader" type="x-shader/x-vertex">
     #version 300 es
 
@@ -12,6 +12,8 @@
     in  vec4 aColor;
     out vec4 vColor;
 
+    uniform mat4 uModelViewMatrix;
+    uniform mat4 uProjectionMatrix;
     uniform vec3 uTheta;
 
     void main()
@@ -41,7 +43,7 @@
 
 
       vColor = aColor;
-      gl_Position = rz * ry * rx * aPosition;
+      gl_Position = rz * ry * rx * uProjectionMatrix * uModelViewMatrix * aPosition;
       gl_Position.z = -gl_Position.z;
     }
   </script>
@@ -66,17 +68,51 @@
   <script type="text/javascript" src="../Common/MVnew.js"></script>
   <script type="text/javascript" src="homework1.js"></script>
 </head>
-<body>
-  <canvas id="gl-canvas" width="1024" height="1024">
-    Oops ... your browser doesn't support the HTML5 canvas element
-  </canvas>
 
-  <button id="xButton">Rotate X</button>
-  <button id="yButton">Rotate Y</button>
-  <button id="zButton">Rotate Z</button>
-  <button id="stopButton">Stop Rotation</button>
-  <button id="directionButton">Change direction</button>
-  
+<body>
+  <div style="display: flex;">
+    <canvas id="gl-canvas" width="1024" height="1024">
+      Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+
+    <div id="buttons">
+      <button id="xButton">Rotate X</button>
+      <button id="yButton">Rotate Y</button>
+      <button id="zButton">Rotate Z</button>
+      <button id="stopButton">Stop Rotation</button>
+      <button id="directionButton">Change direction</button>
+
+
+      <div>
+        zNear .01<input id="zNearSlider" type="range" min=".01" max="3" step="0.1" value="2.21" />
+        3
+      </div>
+      <div>
+        zFar 3<input id="zFarSlider" type="range" min="3" max="10" step="3.0" value="6" />
+        10
+      </div>
+      <div>
+        x -5<input id="xSlider" type="range" min="-5" max="5" step="0.1" value="0" />
+        5
+      </div>
+      <div>
+        y -5<input id="ySlider" type="range" min="-5" max="5" step="0.1" value="0" />
+        5
+      </div>
+      <div>
+        z 0<input id="zSlider" type="range" min="0" max="10" step="0.1" value="4.8" />
+        10
+      </div>
+      <div>
+        fov 10<input id="fovSlider" type="range" min="10" max="120" step="5" value="90" />
+        120
+      </div>
+      <div>
+        aspect 0.5<input id="aspectSlider" type="range" min="0.5" max="2" step="0.1" value="1.5" />
+        2
+      </div>
+    </div>
+  </div>
 
 </body>
 
