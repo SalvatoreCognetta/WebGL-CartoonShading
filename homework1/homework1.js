@@ -12,9 +12,32 @@ var program;
 var c;
 
 var flag = true;
+var flagLight = true;
 
 var pointsArray = [];
 var colorsArray = [];
+var normalsArray = [];
+
+var xLight = 1;
+var yLight = 1;
+var zLight = 1;
+
+var lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
+var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0);
+var lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
+var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0); //no specular
+
+var materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
+var materialDiffuse = vec4(1.0, 0.8, 0.0, 1.0);
+var materialSpecular = vec4(1.0, 0.8, 0.0, 1.0);
+var materialShininess = 100.0;
+
+var ambientProduct; 
+var diffuseProduct;
+var specularProduct;
+
+var lightFlagLoc;
+var ambientProductLoc, diffuseProductLoc, specularProductLoc, lightPositionLoc, materialShininessLoc;
 
 //Rotation
 var xAxis = 0;
@@ -22,21 +45,15 @@ var yAxis = 1;
 var zAxis = 2;
 
 var axis = 0;
-var stopRotation = true;
 var direction = 1;
 var theta = [0, 0, 0];
 var thetaLoc;
-
-//Viewer position
-// var x = 0.0;
-// var y = 0.0;
-// var z = 4.0;
 
 var near = 2.21;
 var far = 6.0;
 var x = 0.0;
 var y = 0.0;
-var z = 4.8;
+var z = -2.8;
 var dr = 5.0 * Math.PI / 180.0;
 
 var fovy = 90.0;  // Field-of-view in Y direction angle (in degrees)
@@ -44,6 +61,7 @@ var aspect = 1.5;       // Viewport aspect ratio
 
 var modelViewMatrix, projectionMatrix;
 var modelViewMatrixLoc, projectionMatrixLoc;
+var rotationMatrix;
 var eye;
 const at = vec3(0.0, 0.0, 0.0);
 const up = vec3(0.0, 1.0, 0.0);
@@ -111,23 +129,34 @@ function quad(a, b, c, d) {
     color = vertexColors[a];
   }
 
+  var t1 = subtract(vertices[b], vertices[a]);
+  var t2 = subtract(vertices[c], vertices[b]);
+  var normal = cross(t1, t2);
+  normal = vec3(normal);
+
   pointsArray.push(vertices[a]);
   colorsArray.push(color);
+  normalsArray.push(normal);
 
   pointsArray.push(vertices[b]);
   colorsArray.push(color);
+  normalsArray.push(normal);
 
   pointsArray.push(vertices[c]);
   colorsArray.push(color);
+  normalsArray.push(normal);
 
   pointsArray.push(vertices[a]);
   colorsArray.push(color);
+  normalsArray.push(normal);
 
   pointsArray.push(vertices[c]);
   colorsArray.push(color);
+  normalsArray.push(normal);
 
   pointsArray.push(vertices[d]);
   colorsArray.push(color);
+  normalsArray.push(normal);
 }
 
 function colorCube() {
@@ -179,10 +208,69 @@ function colorCube() {
   quad(16, 17, 19, 18);
 
   //Pyramid
-  quad(20, 22, 21, 20);
-  quad(21, 24, 22, 21);
-  quad(23, 22, 24, 23);
-  quad(20, 22, 23, 20);
+  quad(20, 22, 21, 21);
+  quad(21, 24, 22, 22);
+  quad(23, 22, 24, 24);
+  quad(20, 22, 23, 23);
+}
+
+function buttonHandler() {
+  //event listeners for buttons
+  document.getElementById("xButton").onclick = function () {
+    axis = xAxis;
+    flag = !flag;
+  };
+  document.getElementById("yButton").onclick = function () {
+    axis = yAxis;
+    flag = !flag;
+  };
+  document.getElementById("zButton").onclick = function () {
+    axis = zAxis;
+    flag = !flag;
+  };
+  document.getElementById("stopButton").onclick = function () {
+    flag = true;
+  };
+  document.getElementById("directionButton").onclick = function () {
+    direction *= -1;
+  };
+
+  // sliders for viewing parameters
+  document.getElementById("zFarSlider").oninput = function (event) {
+    far = event.target.value;
+  };
+  document.getElementById("zNearSlider").oninput = function (event) {
+    near = event.target.value;
+  };
+  document.getElementById("xSlider").oninput = function (event) {
+    x = event.target.value;
+  };
+  document.getElementById("ySlider").oninput = function (event) {
+    y = event.target.value;
+  };
+  document.getElementById("zSlider").oninput = function (event) {
+    z = event.target.value;
+  };
+  document.getElementById("aspectSlider").oninput = function (event) {
+    aspect = event.target.value;
+  };
+  document.getElementById("fovSlider").oninput = function (event) {
+    fovy = event.target.value;
+  };
+
+  // sliders for light position
+  document.getElementById("toggleLight").onclick = function (event) {
+    flagLight = !flagLight
+  };
+  document.getElementById("xLighSlider").oninput = function (event) {
+    xLight = event.target.value;
+  };
+  document.getElementById("yLighSlider").oninput = function (event) {
+    yLight = event.target.value;
+  };
+  document.getElementById("zLighSlider").oninput = function (event) {
+    zLight = event.target.value;
+  };
 }
 
 
@@ -195,7 +283,7 @@ window.onload = function init() {
 
   gl.viewport(0, 0, canvas.width, canvas.height);
 
-  this.aspect = this.canvas.width / this.canvas.height;
+  aspect = canvas.width / canvas.height;
 
   gl.clearColor(1.0, 1.0, 1.0, 1.0);
 
@@ -217,6 +305,14 @@ window.onload = function init() {
   gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(colorLoc);
 
+  var nBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, flatten(normalsArray), gl.STATIC_DRAW);
+
+  var normalLoc = gl.getAttribLocation(program, "aNormal");
+  gl.vertexAttribPointer(normalLoc, 3, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(normalLoc);
+
   var vBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, flatten(pointsArray), gl.STATIC_DRAW);
@@ -228,50 +324,17 @@ window.onload = function init() {
   modelViewMatrixLoc = gl.getUniformLocation(program, "uModelViewMatrix");
   projectionMatrixLoc = gl.getUniformLocation(program, "uProjectionMatrix");
 
+  lightFlagLoc       = gl.getUniformLocation(program,"uLightFlag");
+  ambientProductLoc  = gl.getUniformLocation(program, "uAmbientProduct");
+  diffuseProductLoc  = gl.getUniformLocation(program, "uDiffuseProduct");
+  specularProductLoc = gl.getUniformLocation(program, "uSpecularProduct");
+  lightPositionLoc   = gl.getUniformLocation(program, "uLightPosition");
+
+  gl.uniform1f(gl.getUniformLocation(program, "uShininess"), materialShininess);
+
   thetaLoc = gl.getUniformLocation(program, "uTheta");
 
-  //event listeners for buttons
-  document.getElementById("xButton").onclick = function () {
-    axis = xAxis;
-    stopRotation = !stopRotation;
-  };
-  document.getElementById("yButton").onclick = function () {
-    axis = yAxis;
-    stopRotation = !stopRotation;
-  };
-  document.getElementById("zButton").onclick = function () {
-    axis = zAxis;
-    stopRotation = !stopRotation;
-  };
-  document.getElementById("stopButton").onclick = function () {
-    stopRotation = true;
-  };
-  document.getElementById("directionButton").onclick = function () {
-    direction *= -1;
-  };
-
-  // sliders for viewing parameters
-  document.getElementById("zFarSlider").onchange = function (event) {
-    far = event.target.value;
-  };
-  document.getElementById("zNearSlider").onchange = function (event) {
-    near = event.target.value;
-  };
-  document.getElementById("xSlider").onchange = function (event) {
-    x = event.target.value;
-  };
-  document.getElementById("ySlider").onchange = function (event) {
-    y = event.target.value;
-  };
-  document.getElementById("zSlider").onchange = function (event) {
-    z = event.target.value;
-  };
-  document.getElementById("aspectSlider").onchange = function (event) {
-    aspect = event.target.value;
-  };
-  document.getElementById("fovSlider").onchange = function (event) {
-    fovy = event.target.value;
-  };
+  buttonHandler();
 
   render();
 }
@@ -279,16 +342,33 @@ window.onload = function init() {
 var render = function () {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  if (!stopRotation) {
+  if (!flag) {
     theta[axis] += direction * .9;
   }
 
-  eye = vec3(x,y,z);
+  eye = vec3(x, y, z);
   modelViewMatrix = lookAt(eye, at, up);
   projectionMatrix = perspective(fovy, aspect, near, far);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
   gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
+
+  lightPosition = vec4(xLight, yLight, zLight, 0.0);
+  ambientProduct  = mult(lightAmbient, materialAmbient);
+  diffuseProduct  = mult(lightDiffuse, materialDiffuse);
+
+  gl.uniform1f(lightFlagLoc, flagLight);
+  gl.uniform4fv(ambientProductLoc, ambientProduct);
+  gl.uniform4fv(diffuseProductLoc, diffuseProduct);
+  gl.uniform4fv(lightPositionLoc, lightPosition);
+
+
+  rotationMatrix = mat4();
+  rotationMatrix = mult(rotationMatrix, rotate(theta[xAxis], vec3(1, 0, 0)));
+  rotationMatrix = mult(rotationMatrix, rotate(theta[yAxis], vec3(0, 1, 0)));
+  rotationMatrix = mult(rotationMatrix, rotate(theta[zAxis], vec3(0, 0, 1)));
+
+  gl.uniformMatrix4fv(gl.getUniformLocation(program, "uRotationMatrix"), false, flatten(rotationMatrix));
 
   gl.uniform3fv(thetaLoc, theta);
 
