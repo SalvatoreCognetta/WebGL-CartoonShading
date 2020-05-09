@@ -1,3 +1,7 @@
 * button, input[type="range"] {
     margin-bottom: 1vh;
 }
+
+input[type="text"]:read-only {
+    border: none;
+}

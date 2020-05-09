@@ -11,10 +11,11 @@ var program;
 
 var c;
 
-var flag = true;
-var flagLight = true;
-var flagSpotLight = true;
-var flagTexture = false;
+var flag               = true;
+var flagLight          = true;
+var flagSpotLight      = true;
+var flagTexture        = true;
+var flagCartoonShading = true;
 
 var pointsArray    = [];
 var colorsArray    = [];
@@ -34,11 +35,11 @@ var materialAmbient   = vec4(0.7, 0.0, 1.0, 1.0);
 var materialDiffuse   = vec4(1.0, 0.8, 0.0, 1.0);
 
 //Spotlight vars
-var spotLightPosition   = vec4(0.0, 0.0, 5.0, 1.0 );
+var spotLightPosition   = vec4(0.0, 0.0, 9.0, 1.0 );
 var spotLightAmbient    = vec4(0.2, 0.2, 0.2, 1.0 );
 var spotLightDiffuse    = vec4(1.0, 1.0, 1.0, 1.0 );
-var spotLightDirection  = vec4(0.0, 0.0, 1.0, 1.0);
-var spotCutOff = 0.9;
+var spotLightDirection  = vec4(0.0, 0.0, 0.0, 1.0);
+var spotCutOff = 0.95;
 
 var ambientProduct; 
 var diffuseProduct;
@@ -46,6 +47,7 @@ var specularProduct;
 
 var lightFlagLoc;
 var ambientProductLoc, diffuseProductLoc, specularProductLoc;
+var CiLoc, CsLoc;
 var lightPositionLoc;
 
 var spotLightFlagLoc;
@@ -58,7 +60,7 @@ var xAxis = 0;
 var yAxis = 1;
 var zAxis = 2;
 
-var axis = 0;
+var axis = 1;
 var direction = 1;
 var theta = [0, 0, 0];
 var thetaLoc;
@@ -82,12 +84,13 @@ const up = vec3(0.0, 1.0, 0.0);
 //Matrix
 var modelViewMatrix, projectionMatrix;
 var modelViewMatrixLoc, projectionMatrixLoc;
-var nMatrix, normalMatrixLoc;
 var rotationMatrix;
 
 //Texture vars
 var texture;
 var textureFlagLoc;
+
+var cartoonFlagLoc;
 
 var texCoord = [
     vec2(0, 0),
@@ -278,7 +281,7 @@ function buttonHandler() {
     flag = !flag;
   };
   document.getElementById("stopButton").onclick = function () {
-    flag = true;
+    flag = false;
   };
   document.getElementById("directionButton").onclick = function () {
     direction *= -1;
@@ -325,6 +328,8 @@ function buttonHandler() {
   //slider for spotlight
   document.getElementById("toggleSpotLight").onclick = function (event) {
     flagSpotLight = !flagSpotLight
+    var value_spotlight = flagSpotLight ? "ON" : "OFF";
+    document.getElementById("on-off-spotlight").value = value_spotlight;
   };
   document.getElementById("cutOffSpotLighSlider").oninput = function (event) {
     spotCutOff = event.target.value;
@@ -332,7 +337,16 @@ function buttonHandler() {
 
   //button for texture
   document.getElementById("toggleTexture").onclick = function (event) {
-    flagTexture = !flagTexture
+    flagTexture = !flagTexture;
+    var value_texture = flagTexture ? "ON" : "OFF";
+    document.getElementById("on-off-texture").value = value_texture;
+  };
+
+  //button for cartoon shading
+  document.getElementById("toggleCartoonShading").onclick = function (event) {
+    flagCartoonShading = !flagCartoonShading;
+    var value_texture = flagCartoonShading ? "ON" : "OFF";
+    document.getElementById("on-off-cartoon").value = value_texture;
   };
 }
 
@@ -396,7 +410,6 @@ window.onload = function init() {
 
   modelViewMatrixLoc  = gl.getUniformLocation(program, "uModelViewMatrix");
   projectionMatrixLoc = gl.getUniformLocation(program, "uProjectionMatrix");
-  normalMatrixLoc     = gl.getUniformLocation(program, "uNormalMatrix");
 
   lightFlagLoc       = gl.getUniformLocation(program,"uLightFlag");
   ambientProductLoc  = gl.getUniformLocation(program, "uAmbientProduct");
@@ -418,6 +431,7 @@ window.onload = function init() {
   configureTexture(image);
   textureFlagLoc = gl.getUniformLocation(program,"uTextureFlag");
 
+  cartoonFlagLoc = gl.getUniformLocation(program,"uCartoonShadingFlag");
 
   buttonHandler();
 
@@ -427,18 +441,16 @@ window.onload = function init() {
 var render = function () {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  if (!flag) {
+  if (flag) {
     theta[axis] += direction * .9;
   }
 
   eye = vec3(x, y, z);
   modelViewMatrix  = lookAt(eye, at, up);
   projectionMatrix = perspective(fovy, aspect, near, far);
-  // nMatrix          = normalMatrix(modelViewMatrix, true);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
   gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
-  // gl.uniformMatrix3fv(normalMatrixLoc, false, flatten(nMatrix));
 
   rotationMatrix = mat4();
   rotationMatrix = mult(rotationMatrix, rotate(theta[xAxis], vec3(1, 0, 0)));
@@ -469,6 +481,8 @@ var render = function () {
   gl.uniform4fv(spotLightDirectionLoc, spotLightDirection);
 
   gl.uniform1f(textureFlagLoc, flagTexture);
+
+  gl.uniform1f(cartoonFlagLoc, flagCartoonShading);
 
   gl.drawArrays(gl.TRIANGLES, 0, numVertices);
   requestAnimationFrame(render);

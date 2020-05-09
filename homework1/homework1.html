@@ -15,24 +15,18 @@
 
     out vec4 vColor;
     out vec2 vTexCoord;
+    out vec3 N, L, E;
+    out vec3 spotD, spotL, spotE;
     
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
-    uniform mat3 uNormalMatrix;
     uniform mat4 uRotationMatrix;
-    
-    uniform vec4 uAmbientProduct, uDiffuseProduct, uSpecularProduct;
-    uniform bool uLightFlag;
-    uniform vec4 uLightPosition;
 
     uniform vec3 uTheta;
-
-    uniform vec4 uSpotLightPosition;
-    uniform vec4 uSpotAmbientProduct, uSpotDiffuseProduct;
+    
+    uniform vec4 uLightPosition;
+    uniform vec4 uSpotLightPosition;    
     uniform vec4 uSpotLightDirection;
-    uniform bool uSpotLightFlag;
-    uniform float uSpotCutOff;
-
 
     void main()
     {
@@ -41,40 +35,96 @@
       //directional light
       //fixed light postion
       vec3 light = uLightPosition.xyz;
-      vec3 L;
       if(uLightPosition.w == 0.0) 
         L = normalize(light);
       else
         L = normalize(light - pos);
 
-      vec3 E = normalize(-pos);
-      vec3 H = normalize(L + E);
-
+      E = normalize(-pos);
       vec4 NN = vec4(aNormal,0);
-      
-      
-      vec3 N = normalize((uRotationMatrix*NN).xyz);
-      //vec3 N = normalize((uNormalMatrix*aNormal).xyz);
+      N = normalize((uRotationMatrix*NN).xyz);
+
+      //spotlight
+      spotD   = uSpotLightPosition.xyz;
+      spotL   = normalize(spotD);
+      spotE   = normalize(-pos);
+
+
+      vTexCoord = aTexCoord;
+      gl_Position = uProjectionMatrix * uModelViewMatrix * uRotationMatrix * aPosition;
+      vColor = aColor;
+    }
+  </script>
+
+  <script id="fragment-shader" type="x-shader/x-fragment">
+    #version 300 es
+
+    precision mediump float;
+
+    in vec4 vColor;
+    in vec2 vTexCoord;
+    in vec3 N, L, E;
+    in vec3 spotD, spotL, spotE;
+
+    out vec4 fColor;
+
+    uniform sampler2D uTextureMap;
+    uniform bool uTextureFlag;
+    
+    uniform vec4 uAmbientProduct, uDiffuseProduct;
+    uniform bool uLightFlag;
+
+    uniform bool uCartoonShadingFlag;
+    
+    uniform vec4 uSpotAmbientProduct, uSpotDiffuseProduct;
+    uniform bool uSpotLightFlag;
+    uniform float uSpotCutOff;
+    uniform vec4 uCi;
+
+    void
+    main()
+    {
+      vec3 H = normalize(L + E);
 
       // Compute terms in the illumination equation
       vec4 ambient = uAmbientProduct;
 
-      float Kd = max(dot(L, N), 0.0);
-      vec4  diffuse = Kd * uDiffuseProduct;
-
-      //spotlight
-      vec3 spotLight = uSpotLightPosition.xyz;
-      vec3 spotL     = normalize(spotLight);
-      vec3 spotE     = normalize(-pos);
-      vec3 spotH     = normalize(spotL + spotE);
-      vec3 spotD     = uSpotLightDirection.xyz;
-      vec4 spotAmbient = uSpotAmbientProduct;
-      float spotKd   = max(dot(spotL,N),0.0);
-      vec4 spotDiffuse = spotKd * uSpotDiffuseProduct;
-      float lEffect = dot(normalize(spotD), normalize((spotL+spotE)));
-
       vec4 totAmbient = vec4(0,0,0,0);
       vec4 totDiffuse = vec4(1,1,1,1);
+
+      vec4  diffuse;
+
+      if (uCartoonShadingFlag) {
+        if (max(dot(L, N), 0.0) >= 0.5) {
+          diffuse = uAmbientProduct + uDiffuseProduct;
+        } else {
+          diffuse = uAmbientProduct;
+        }
+      } else {
+        float Kd = max(dot(L, N), 0.0);
+        diffuse = Kd * uDiffuseProduct;
+      }
+
+
+      //spotlight
+      vec3 spotH     = normalize(spotL + spotE);
+      vec4 spotAmbient = uSpotAmbientProduct;
+      
+      vec4 spotDiffuse;
+
+      if (uCartoonShadingFlag) {
+        if (max(dot(spotL, N), 0.0) >= 0.5) {
+          spotDiffuse = uSpotAmbientProduct + uSpotDiffuseProduct;
+        } else {
+          spotDiffuse = uSpotAmbientProduct;
+        }
+      } else {
+        float spotKd   = max(dot(spotL,N),0.0);
+        spotDiffuse = spotKd * uSpotDiffuseProduct;
+      }
+      
+      float lEffect = dot(normalize(spotD), normalize((spotL+spotE)));
+      
       
       if(uSpotLightFlag && lEffect > uSpotCutOff)
       {
@@ -90,35 +140,14 @@
         totDiffuse = diffuse;
       }
 
-      vColor = (totAmbient + aColor*totDiffuse);
-      vColor.a = 1.0;
+      fColor = vColor * totDiffuse;
 
-      vTexCoord = aTexCoord;
-      gl_Position = uProjectionMatrix * uModelViewMatrix * uRotationMatrix * aPosition;
-    }
-  </script>
-
-  <script id="fragment-shader" type="x-shader/x-fragment">
-    #version 300 es
-
-    precision mediump float;
-
-    in vec4 vColor;
-    in vec2 vTexCoord;
-
-    out vec4 fColor;
-
-    uniform sampler2D uTextureMap;
-    uniform bool uTextureFlag;
-
-    void
-    main()
-    {
       if (uTextureFlag) {
-        fColor = vColor * texture(uTextureMap, vTexCoord);
+        fColor = fColor * texture(uTextureMap, vTexCoord);
       } else {
-        fColor = vColor;
+        fColor = fColor;
       }
+      fColor.a=1.0;
     }
   </script>
 
@@ -151,16 +180,17 @@
           zFar 3<input id="zFarSlider" type="range" min="0" max="10" step=".1" value="6" />
           10
         </div>
+        Eye position
         <div>
-          x -5<input id="xSlider" type="range" min="-5" max="5" step="0.1" value="0" />
+          Eye x -5<input id="xSlider" type="range" min="-5" max="5" step="0.1" value="0" />
           5
         </div>
         <div>
-          y -5<input id="ySlider" type="range" min="-5" max="5" step="0.1" value="0" />
+          Eye y -5<input id="ySlider" type="range" min="-5" max="5" step="0.1" value="0" />
           5
         </div>
         <div>
-          z 0<input id="zSlider" type="range" min="0" max="10" step="0.1" value="2.3" />
+          Eye z 0<input id="zSlider" type="range" min="0" max="10" step="0.1" value="2.3" />
           10
         </div>
         <div>
@@ -187,12 +217,17 @@
         </div>
 
         <button id="toggleSpotLight">Toggle Spot Light</button>
+        <input id="on-off-spotlight" type="text" value="ON" readonly>
         <div>
           cutOff 0.5<input id="cutOffSpotLighSlider" type="range" min="0.5" max="1" step="0.01" value=".9" />
           1
         </div>
 
         <button id="toggleTexture">Toggle Texture</button>
+        <input id="on-off-texture" type="text" value="ON" readonly>
+
+        <button id="toggleCartoonShading">Toggle Cartoon Shading</button>
+        <input id="on-off-cartoon" type="text" value="ON" readonly>
       </div>
     </div>
   </div>
