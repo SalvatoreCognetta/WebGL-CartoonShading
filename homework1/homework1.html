@@ -18,6 +18,7 @@
     
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
+    uniform mat3 uNormalMatrix;
     uniform mat4 uRotationMatrix;
     
     uniform vec4 uAmbientProduct, uDiffuseProduct, uSpecularProduct;
@@ -50,9 +51,10 @@
       vec3 H = normalize(L + E);
 
       vec4 NN = vec4(aNormal,0);
-
-      // Transform vertex normal into eye coordinates
+      
+      
       vec3 N = normalize((uRotationMatrix*NN).xyz);
+      //vec3 N = normalize((uNormalMatrix*aNormal).xyz);
 
       // Compute terms in the illumination equation
       vec4 ambient = uAmbientProduct;
@@ -71,18 +73,25 @@
       vec4 spotDiffuse = spotKd * uSpotDiffuseProduct;
       float lEffect = dot(normalize(spotD), normalize((spotL+spotE)));
 
+      vec4 totAmbient = vec4(0,0,0,0);
+      vec4 totDiffuse = vec4(1,1,1,1);
+      
       if(uSpotLightFlag && lEffect > uSpotCutOff)
       {
-        vec4 totAmbient = ambient + spotAmbient;
-        vec4 diffuse = diffuse + spotDiffuse;
-        vColor = (totAmbient + aColor*diffuse);
-        vColor.a = 1.0;
-      } else {
-        vColor = aColor;
-        if (uLightFlag)
-          vColor = (ambient + aColor*diffuse);
-        vColor.a = 1.0;
+        if (uLightFlag) {
+          totAmbient = ambient + spotAmbient;
+          totDiffuse = diffuse + spotDiffuse;
+        } else {
+          totAmbient = spotAmbient;
+          totDiffuse = spotDiffuse;
+        }
+      } else if (uLightFlag) {
+        totAmbient = ambient;
+        totDiffuse = diffuse;
       }
+
+      vColor = (totAmbient + aColor*totDiffuse);
+      vColor.a = 1.0;
 
       vTexCoord = aTexCoord;
       gl_Position = uProjectionMatrix * uModelViewMatrix * uRotationMatrix * aPosition;
@@ -163,7 +172,7 @@
           2
         </div>
 
-        <button id="toggleLight">Toggle Light</button>
+        <!-- <button id="toggleLight">Toggle Light</button> -->
         <div>
           xLight -10<input id="xLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
           10
@@ -179,7 +188,7 @@
 
         <button id="toggleSpotLight">Toggle Spot Light</button>
         <div>
-          cutOff 0<input id="cutOffSpotLighSlider" type="range" min="0" max="1" step="0.05" value=".849" />
+          cutOff 0.5<input id="cutOffSpotLighSlider" type="range" min="0.5" max="1" step="0.01" value=".9" />
           1
         </div>
 

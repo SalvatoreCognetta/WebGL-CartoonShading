@@ -14,7 +14,7 @@ var c;
 var flag = true;
 var flagLight = true;
 var flagSpotLight = true;
-var flagTexture = true;
+var flagTexture = false;
 
 var pointsArray    = [];
 var colorsArray    = [];
@@ -34,11 +34,11 @@ var materialAmbient   = vec4(0.7, 0.0, 1.0, 1.0);
 var materialDiffuse   = vec4(1.0, 0.8, 0.0, 1.0);
 
 //Spotlight vars
-var spotLightPosition   = vec4(0.0, 0.0, 2.0, 1.0 );
+var spotLightPosition   = vec4(0.0, 0.0, 5.0, 1.0 );
 var spotLightAmbient    = vec4(0.2, 0.2, 0.2, 1.0 );
 var spotLightDiffuse    = vec4(1.0, 1.0, 1.0, 1.0 );
-var spotLightDirection  = vec4(0.0,0.0,1.0,1.0);
-var spotCutOff = 0.849;
+var spotLightDirection  = vec4(0.0, 0.0, 1.0, 1.0);
+var spotCutOff = 0.9;
 
 var ambientProduct; 
 var diffuseProduct;
@@ -82,6 +82,7 @@ const up = vec3(0.0, 1.0, 0.0);
 //Matrix
 var modelViewMatrix, projectionMatrix;
 var modelViewMatrixLoc, projectionMatrixLoc;
+var nMatrix, normalMatrixLoc;
 var rotationMatrix;
 
 //Texture vars
@@ -308,9 +309,9 @@ function buttonHandler() {
   };
 
   // sliders for light position
-  document.getElementById("toggleLight").onclick = function (event) {
-    flagLight = !flagLight
-  };
+  // document.getElementById("toggleLight").onclick = function (event) {
+  //   flagLight = !flagLight
+  // };
   document.getElementById("xLighSlider").oninput = function (event) {
     xLight = event.target.value;
   };
@@ -395,6 +396,7 @@ window.onload = function init() {
 
   modelViewMatrixLoc  = gl.getUniformLocation(program, "uModelViewMatrix");
   projectionMatrixLoc = gl.getUniformLocation(program, "uProjectionMatrix");
+  normalMatrixLoc     = gl.getUniformLocation(program, "uNormalMatrix");
 
   lightFlagLoc       = gl.getUniformLocation(program,"uLightFlag");
   ambientProductLoc  = gl.getUniformLocation(program, "uAmbientProduct");
@@ -430,11 +432,13 @@ var render = function () {
   }
 
   eye = vec3(x, y, z);
-  modelViewMatrix = lookAt(eye, at, up);
+  modelViewMatrix  = lookAt(eye, at, up);
   projectionMatrix = perspective(fovy, aspect, near, far);
+  // nMatrix          = normalMatrix(modelViewMatrix, true);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
   gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
+  // gl.uniformMatrix3fv(normalMatrixLoc, false, flatten(nMatrix));
 
   rotationMatrix = mat4();
   rotationMatrix = mult(rotationMatrix, rotate(theta[xAxis], vec3(1, 0, 0)));
