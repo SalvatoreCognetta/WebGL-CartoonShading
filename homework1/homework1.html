@@ -11,21 +11,33 @@
     in  vec4 aPosition;
     in  vec4 aColor;
     in  vec3 aNormal;
+    in  vec2 aTexCoord;
+
     out vec4 vColor;
+    out vec2 vTexCoord;
     
-    uniform vec4 uAmbientProduct, uDiffuseProduct, uSpecularProduct;
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
     uniform mat4 uRotationMatrix;
+    
+    uniform vec4 uAmbientProduct, uDiffuseProduct, uSpecularProduct;
     uniform bool uLightFlag;
     uniform vec4 uLightPosition;
-    uniform float uShininess;
+
     uniform vec3 uTheta;
+
+    uniform vec4 uSpotLightPosition;
+    uniform vec4 uSpotAmbientProduct, uSpotDiffuseProduct;
+    uniform vec4 uSpotLightDirection;
+    uniform bool uSpotLightFlag;
+    uniform float uSpotCutOff;
+
 
     void main()
     {
       vec3 pos = -(uRotationMatrix * aPosition).xyz;
 
+      //directional light
       //fixed light postion
       vec3 light = uLightPosition.xyz;
       vec3 L;
@@ -46,14 +58,34 @@
       vec4 ambient = uAmbientProduct;
 
       float Kd = max(dot(L, N), 0.0);
-      vec4  diffuse = Kd*uDiffuseProduct;
+      vec4  diffuse = Kd * uDiffuseProduct;
 
-      vColor = aColor;
-      if (uLightFlag)
-        vColor += ambient + diffuse;
-      vColor.a = 1.0;
+      //spotlight
+      vec3 spotLight = uSpotLightPosition.xyz;
+      vec3 spotL     = normalize(spotLight);
+      vec3 spotE     = normalize(-pos);
+      vec3 spotH     = normalize(spotL + spotE);
+      vec3 spotD     = uSpotLightDirection.xyz;
+      vec4 spotAmbient = uSpotAmbientProduct;
+      float spotKd   = max(dot(spotL,N),0.0);
+      vec4 spotDiffuse = spotKd * uSpotDiffuseProduct;
+      float lEffect = dot(normalize(spotD), normalize((spotL+spotE)));
+
+      if(uSpotLightFlag && lEffect > uSpotCutOff)
+      {
+        vec4 totAmbient = ambient + spotAmbient;
+        vec4 diffuse = diffuse + spotDiffuse;
+        vColor = (totAmbient + aColor*diffuse);
+        vColor.a = 1.0;
+      } else {
+        vColor = aColor;
+        if (uLightFlag)
+          vColor = (ambient + aColor*diffuse);
+        vColor.a = 1.0;
+      }
+
+      vTexCoord = aTexCoord;
       gl_Position = uProjectionMatrix * uModelViewMatrix * uRotationMatrix * aPosition;
-      gl_Position.z = -gl_Position.z;
     }
   </script>
 
@@ -63,13 +95,21 @@
     precision mediump float;
 
     in vec4 vColor;
+    in vec2 vTexCoord;
+
     out vec4 fColor;
+
+    uniform sampler2D uTextureMap;
+    uniform bool uTextureFlag;
 
     void
     main()
     {
+      if (uTextureFlag) {
+        fColor = vColor * texture(uTextureMap, vTexCoord);
+      } else {
         fColor = vColor;
-
+      }
     }
   </script>
 
@@ -84,6 +124,7 @@
     <canvas id="gl-canvas" width="1024" height="1024">
       Oops ... your browser doesn't support the HTML5 canvas element
     </canvas>
+    <img id = "textureImg" src = "./textures/stone-texture.jpg" hidden></img>
 
     <div id="buttons">
       <button id="xButton">Rotate X</button>
@@ -92,48 +133,57 @@
       <button id="stopButton">Stop Rotation</button>
       <button id="directionButton">Change direction</button>
 
+      <div>
+        <div>
+          zNear .01<input id="zNearSlider" type="range" min=".01" max="3" step="0.1" value="2.0" />
+          3
+        </div>
+        <div>
+          zFar 3<input id="zFarSlider" type="range" min="0" max="10" step=".1" value="6" />
+          10
+        </div>
+        <div>
+          x -5<input id="xSlider" type="range" min="-5" max="5" step="0.1" value="0" />
+          5
+        </div>
+        <div>
+          y -5<input id="ySlider" type="range" min="-5" max="5" step="0.1" value="0" />
+          5
+        </div>
+        <div>
+          z 0<input id="zSlider" type="range" min="0" max="10" step="0.1" value="2.3" />
+          10
+        </div>
+        <div>
+          fov 10<input id="fovSlider" type="range" min="10" max="120" step="5" value="90" />
+          120
+        </div>
+        <div>
+          aspect 0.5<input id="aspectSlider" type="range" min="0.5" max="2" step="0.1" value="1.5" />
+          2
+        </div>
 
-      <div>
-        zNear .01<input id="zNearSlider" type="range" min=".01" max="3" step="0.1" value="2.21" />
-        3
-      </div>
-      <div>
-        zFar 3<input id="zFarSlider" type="range" min="3" max="10" step="3.0" value="6" />
-        10
-      </div>
-      <div>
-        x -5<input id="xSlider" type="range" min="-5" max="5" step="0.1" value="0" />
-        5
-      </div>
-      <div>
-        y -5<input id="ySlider" type="range" min="-5" max="5" step="0.1" value="0" />
-        5
-      </div>
-      <div>
-        z 0<input id="zSlider" type="range" min="0" max="10" step="0.1" value="4.8" />
-        10
-      </div>
-      <div>
-        fov 10<input id="fovSlider" type="range" min="10" max="120" step="5" value="90" />
-        120
-      </div>
-      <div>
-        aspect 0.5<input id="aspectSlider" type="range" min="0.5" max="2" step="0.1" value="1.5" />
-        2
-      </div>
+        <button id="toggleLight">Toggle Light</button>
+        <div>
+          xLight -10<input id="xLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
+          10
+        </div>
+        <div>
+          yLight -10<input id="yLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
+          10
+        </div>
+        <div>
+          zLight -10<input id="zLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
+          10
+        </div>
 
-      <button id="toggleLight">Toggle Light</button>
-      <div>
-        xLight -10<input id="xLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
-        10
-      </div>
-      <div>
-        yLight -10<input id="yLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
-        10
-      </div>
-      <div>
-        zLight -10<input id="zLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
-        10
+        <button id="toggleSpotLight">Toggle Spot Light</button>
+        <div>
+          cutOff 0<input id="cutOffSpotLighSlider" type="range" min="0" max="1" step="0.05" value=".849" />
+          1
+        </div>
+
+        <button id="toggleTexture">Toggle Texture</button>
       </div>
     </div>
   </div>

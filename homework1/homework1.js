@@ -13,31 +13,45 @@ var c;
 
 var flag = true;
 var flagLight = true;
+var flagSpotLight = true;
+var flagTexture = true;
 
-var pointsArray = [];
-var colorsArray = [];
-var normalsArray = [];
+var pointsArray    = [];
+var colorsArray    = [];
+var normalsArray   = [];
+var texCoordsArray = [];
 
+//Position of the directional light
 var xLight = 1;
 var yLight = 1;
 var zLight = 1;
 
-var lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
-var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0);
-var lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
-var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0); //no specular
+var lightPosition = vec4(xLight, yLight, zLight, 0.0);
+var lightAmbient  = vec4(0.2, 0.2, 0.2, 1.0);
+var lightDiffuse  = vec4(1.0, 1.0, 1.0, 1.0);
 
-var materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
-var materialDiffuse = vec4(1.0, 0.8, 0.0, 1.0);
-var materialSpecular = vec4(1.0, 0.8, 0.0, 1.0);
-var materialShininess = 100.0;
+var materialAmbient   = vec4(0.7, 0.0, 1.0, 1.0);
+var materialDiffuse   = vec4(1.0, 0.8, 0.0, 1.0);
+
+//Spotlight vars
+var spotLightPosition   = vec4(0.0, 0.0, 2.0, 1.0 );
+var spotLightAmbient    = vec4(0.2, 0.2, 0.2, 1.0 );
+var spotLightDiffuse    = vec4(1.0, 1.0, 1.0, 1.0 );
+var spotLightDirection  = vec4(0.0,0.0,1.0,1.0);
+var spotCutOff = 0.849;
 
 var ambientProduct; 
 var diffuseProduct;
 var specularProduct;
 
 var lightFlagLoc;
-var ambientProductLoc, diffuseProductLoc, specularProductLoc, lightPositionLoc, materialShininessLoc;
+var ambientProductLoc, diffuseProductLoc, specularProductLoc;
+var lightPositionLoc;
+
+var spotLightFlagLoc;
+var spotAmbientProductLoc, spotDiffuseProductLoc;
+var spotLightPositionLoc, spotLightDirectionLoc;
+var spotCutOffLoc;
 
 //Rotation
 var xAxis = 0;
@@ -49,22 +63,37 @@ var direction = 1;
 var theta = [0, 0, 0];
 var thetaLoc;
 
-var near = 2.21;
+//Frustum vars
+var near = 2.00;
 var far = 6.0;
-var x = 0.0;
-var y = 0.0;
-var z = -2.8;
 var dr = 5.0 * Math.PI / 180.0;
 
 var fovy = 90.0;  // Field-of-view in Y direction angle (in degrees)
 var aspect = 1.5;       // Viewport aspect ratio
 
-var modelViewMatrix, projectionMatrix;
-var modelViewMatrixLoc, projectionMatrixLoc;
-var rotationMatrix;
+//Eye position
+var x = 0.0;
+var y = 0.0;
+var z = 2.8;
 var eye;
 const at = vec3(0.0, 0.0, 0.0);
 const up = vec3(0.0, 1.0, 0.0);
+
+//Matrix
+var modelViewMatrix, projectionMatrix;
+var modelViewMatrixLoc, projectionMatrixLoc;
+var rotationMatrix;
+
+//Texture vars
+var texture;
+var textureFlagLoc;
+
+var texCoord = [
+    vec2(0, 0),
+    vec2(0, 1),
+    vec2(1, 1),
+    vec2(1, 0)
+];
 
 var vertices = [
   vec4(-0.4, -0.5, 0.4, 1.0),   //0
@@ -119,12 +148,25 @@ var vertexColors = [
   vec4(0.0, 1.0, 1.0, 1.0)   // cyan
 ];
 
-var thetaLoc;
+
+function configureTexture( image ) {
+  texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB,
+       gl.RGB, gl.UNSIGNED_BYTE, image);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,
+                    gl.NEAREST_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+  gl.uniform1i(gl.getUniformLocation(program, "uTextureMap"), 0);
+}
 
 function quad(a, b, c, d) {
   var color;
   if (true) { //a >= vertexColors.length
     color = vec4(Math.random(), Math.random(), Math.random(), 1.0);   // test
+    // color = vec4(1.0, 0.0, 1.0, 1.0);  // 
   } else {
     color = vertexColors[a];
   }
@@ -137,26 +179,32 @@ function quad(a, b, c, d) {
   pointsArray.push(vertices[a]);
   colorsArray.push(color);
   normalsArray.push(normal);
+  texCoordsArray.push(texCoord[0]);
 
   pointsArray.push(vertices[b]);
   colorsArray.push(color);
   normalsArray.push(normal);
+  texCoordsArray.push(texCoord[1]);
 
   pointsArray.push(vertices[c]);
   colorsArray.push(color);
   normalsArray.push(normal);
+  texCoordsArray.push(texCoord[2]);
 
   pointsArray.push(vertices[a]);
   colorsArray.push(color);
   normalsArray.push(normal);
+  texCoordsArray.push(texCoord[0]);
 
   pointsArray.push(vertices[c]);
   colorsArray.push(color);
   normalsArray.push(normal);
+  texCoordsArray.push(texCoord[2]);
 
   pointsArray.push(vertices[d]);
   colorsArray.push(color);
   normalsArray.push(normal);
+  texCoordsArray.push(texCoord[3]);
 }
 
 function colorCube() {
@@ -237,25 +285,26 @@ function buttonHandler() {
 
   // sliders for viewing parameters
   document.getElementById("zFarSlider").oninput = function (event) {
-    far = event.target.value;
+    far = +event.target.value;
+    console.log = far;
   };
   document.getElementById("zNearSlider").oninput = function (event) {
-    near = event.target.value;
+    near = +event.target.value;
   };
   document.getElementById("xSlider").oninput = function (event) {
-    x = event.target.value;
+    x = +event.target.value;
   };
   document.getElementById("ySlider").oninput = function (event) {
-    y = event.target.value;
+    y = +event.target.value;
   };
   document.getElementById("zSlider").oninput = function (event) {
-    z = event.target.value;
+    z = +event.target.value;
   };
   document.getElementById("aspectSlider").oninput = function (event) {
-    aspect = event.target.value;
+    aspect = +event.target.value;
   };
   document.getElementById("fovSlider").oninput = function (event) {
-    fovy = event.target.value;
+    fovy = +event.target.value;
   };
 
   // sliders for light position
@@ -270,6 +319,19 @@ function buttonHandler() {
   };
   document.getElementById("zLighSlider").oninput = function (event) {
     zLight = event.target.value;
+  };
+
+  //slider for spotlight
+  document.getElementById("toggleSpotLight").onclick = function (event) {
+    flagSpotLight = !flagSpotLight
+  };
+  document.getElementById("cutOffSpotLighSlider").oninput = function (event) {
+    spotCutOff = event.target.value;
+  };
+
+  //button for texture
+  document.getElementById("toggleTexture").onclick = function (event) {
+    flagTexture = !flagTexture
   };
 }
 
@@ -321,7 +383,17 @@ window.onload = function init() {
   gl.vertexAttribPointer(positionLoc, 4, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(positionLoc);
 
-  modelViewMatrixLoc = gl.getUniformLocation(program, "uModelViewMatrix");
+  var tBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoordsArray), gl.STATIC_DRAW);
+
+  var texCoordLoc = gl.getAttribLocation(program, "aTexCoord");
+  gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(texCoordLoc);
+
+  thetaLoc = gl.getUniformLocation(program, "uTheta");
+
+  modelViewMatrixLoc  = gl.getUniformLocation(program, "uModelViewMatrix");
   projectionMatrixLoc = gl.getUniformLocation(program, "uProjectionMatrix");
 
   lightFlagLoc       = gl.getUniformLocation(program,"uLightFlag");
@@ -330,9 +402,20 @@ window.onload = function init() {
   specularProductLoc = gl.getUniformLocation(program, "uSpecularProduct");
   lightPositionLoc   = gl.getUniformLocation(program, "uLightPosition");
 
-  gl.uniform1f(gl.getUniformLocation(program, "uShininess"), materialShininess);
+  //spotlight
+  spotLightFlagLoc      = gl.getUniformLocation(program,"uSpotLightFlag");
+  spotAmbientProductLoc = gl.getUniformLocation(program, "uSpotAmbientProduct");
+  spotDiffuseProductLoc = gl.getUniformLocation(program, "uSpotDiffuseProduct");
+  spotLightPositionLoc  = gl.getUniformLocation(program, "uSpotLightPosition");
+  spotLightDirectionLoc = gl.getUniformLocation(program, "uSpotLightDirection");
+  
+  spotCutOffLoc = gl.getUniformLocation(program, "uSpotCutOff");
 
-  thetaLoc = gl.getUniformLocation(program, "uTheta");
+  //Texture
+  var image = document.getElementById("textureImg");
+  configureTexture(image);
+  textureFlagLoc = gl.getUniformLocation(program,"uTextureFlag");
+
 
   buttonHandler();
 
@@ -353,16 +436,6 @@ var render = function () {
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
   gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
 
-  lightPosition = vec4(xLight, yLight, zLight, 0.0);
-  ambientProduct  = mult(lightAmbient, materialAmbient);
-  diffuseProduct  = mult(lightDiffuse, materialDiffuse);
-
-  gl.uniform1f(lightFlagLoc, flagLight);
-  gl.uniform4fv(ambientProductLoc, ambientProduct);
-  gl.uniform4fv(diffuseProductLoc, diffuseProduct);
-  gl.uniform4fv(lightPositionLoc, lightPosition);
-
-
   rotationMatrix = mat4();
   rotationMatrix = mult(rotationMatrix, rotate(theta[xAxis], vec3(1, 0, 0)));
   rotationMatrix = mult(rotationMatrix, rotate(theta[yAxis], vec3(0, 1, 0)));
@@ -371,6 +444,27 @@ var render = function () {
   gl.uniformMatrix4fv(gl.getUniformLocation(program, "uRotationMatrix"), false, flatten(rotationMatrix));
 
   gl.uniform3fv(thetaLoc, theta);
+
+
+  lightPosition   = vec4(xLight, yLight, zLight, 0.0);
+  ambientProduct  = mult(lightAmbient, materialAmbient);
+  diffuseProduct  = mult(lightDiffuse, materialDiffuse);
+
+  gl.uniform1f(lightFlagLoc, flagLight);
+  gl.uniform4fv(ambientProductLoc, ambientProduct);
+  gl.uniform4fv(diffuseProductLoc, diffuseProduct);
+  gl.uniform4fv(lightPositionLoc, lightPosition);
+
+  var spotAmbientProduct = mult(spotLightAmbient, materialAmbient);
+  var spotDiffuseProduct = mult(spotLightDiffuse, materialDiffuse);
+  gl.uniform1f(spotLightFlagLoc, flagSpotLight);
+  gl.uniform4fv(spotAmbientProductLoc, flatten(spotAmbientProduct));
+  gl.uniform4fv(spotDiffuseProductLoc, flatten(spotDiffuseProduct));
+  gl.uniform4fv(spotLightPositionLoc,  flatten(spotLightPosition));
+  gl.uniform1f(spotCutOffLoc, spotCutOff);
+  gl.uniform4fv(spotLightDirectionLoc, spotLightDirection);
+
+  gl.uniform1f(textureFlagLoc, flagTexture);
 
   gl.drawArrays(gl.TRIANGLES, 0, numVertices);
   requestAnimationFrame(render);
