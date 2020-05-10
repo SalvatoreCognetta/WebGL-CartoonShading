@@ -33,7 +33,6 @@
       vec3 pos = -(uRotationMatrix * aPosition).xyz;
 
       //directional light
-      //fixed light postion
       vec3 light = uLightPosition.xyz;
       if(uLightPosition.w == 0.0) 
         L = normalize(light);
@@ -45,10 +44,10 @@
       N = normalize((uRotationMatrix*NN).xyz);
 
       //spotlight
-      spotD   = uSpotLightPosition.xyz;
-      spotL   = normalize(spotD);
+      vec3 spotlight = uSpotLightPosition.xyz;
+      spotL   = normalize(spotlight);
+      spotD   = uSpotLightDirection.xyz;
       spotE   = normalize(-pos);
-
 
       vTexCoord = aTexCoord;
       gl_Position = uProjectionMatrix * uModelViewMatrix * uRotationMatrix * aPosition;
@@ -79,13 +78,10 @@
     uniform vec4 uSpotAmbientProduct, uSpotDiffuseProduct;
     uniform bool uSpotLightFlag;
     uniform float uSpotCutOff;
-    uniform vec4 uCi;
 
     void
     main()
     {
-      vec3 H = normalize(L + E);
-
       // Compute terms in the illumination equation
       vec4 ambient = uAmbientProduct;
 
@@ -105,9 +101,7 @@
         diffuse = Kd * uDiffuseProduct;
       }
 
-
       //spotlight
-      vec3 spotH     = normalize(spotL + spotE);
       vec4 spotAmbient = uSpotAmbientProduct;
       
       vec4 spotDiffuse;
@@ -119,14 +113,15 @@
           spotDiffuse = uSpotAmbientProduct;
         }
       } else {
-        float spotKd   = max(dot(spotL,N),0.0);
+        float spotKd   = max(dot(spotL, N), 0.0);
         spotDiffuse = spotKd * uSpotDiffuseProduct;
       }
+
+      //cosine of the angle between the spotlight direction and 
+      //the resultant of the spotlight position and the eye position
+      float spotlight_angle = dot(normalize(spotD), normalize((spotL + spotE)));
       
-      float lEffect = dot(normalize(spotD), normalize((spotL+spotE)));
-      
-      
-      if(uSpotLightFlag && lEffect > uSpotCutOff)
+      if(uSpotLightFlag && spotlight_angle > uSpotCutOff)
       {
         if (uLightFlag) {
           totAmbient = ambient + spotAmbient;
@@ -140,7 +135,7 @@
         totDiffuse = diffuse;
       }
 
-      fColor = vColor * totDiffuse;
+      fColor = totAmbient + vColor * totDiffuse;
 
       if (uTextureFlag) {
         fColor = fColor * texture(uTextureMap, vTexCoord);
@@ -162,7 +157,8 @@
     <canvas id="gl-canvas" width="1024" height="1024">
       Oops ... your browser doesn't support the HTML5 canvas element
     </canvas>
-    <img id = "textureImg" src = "./textures/stone-texture.jpg" hidden></img>
+    <!-- <img id = "textureImg" src = "./textures/stone-texture.jpg" hidden></img> -->
+    <img id = "textureImg" src = "./stone-texture.jpg" hidden></img>
 
     <div id="buttons">
       <button id="xButton">Rotate X</button>
@@ -172,14 +168,6 @@
       <button id="directionButton">Change direction</button>
 
       <div>
-        <div>
-          zNear .01<input id="zNearSlider" type="range" min=".01" max="3" step="0.1" value="2.0" />
-          3
-        </div>
-        <div>
-          zFar 3<input id="zFarSlider" type="range" min="0" max="10" step=".1" value="6" />
-          10
-        </div>
         Eye position
         <div>
           Eye x -5<input id="xSlider" type="range" min="-5" max="5" step="0.1" value="0" />
@@ -197,12 +185,21 @@
           fov 10<input id="fovSlider" type="range" min="10" max="120" step="5" value="90" />
           120
         </div>
+        Projection sliders
+        <div>
+          zNear .01<input id="zNearSlider" type="range" min=".01" max="3" step="0.1" value="2.0" />
+          3
+        </div>
+        <div>
+          zFar 3<input id="zFarSlider" type="range" min="0" max="10" step=".1" value="6" />
+          10
+        </div>
         <div>
           aspect 0.5<input id="aspectSlider" type="range" min="0.5" max="2" step="0.1" value="1.5" />
           2
         </div>
 
-        <!-- <button id="toggleLight">Toggle Light</button> -->
+        Directional light position
         <div>
           xLight -10<input id="xLighSlider" type="range" min="-10" max="10" step="0.5" value="1.0" />
           10

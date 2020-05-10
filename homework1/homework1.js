@@ -11,7 +11,7 @@ var program;
 
 var c;
 
-var flag               = true;
+var flag               = false;
 var flagLight          = true;
 var flagSpotLight      = true;
 var flagTexture        = true;
@@ -38,7 +38,7 @@ var materialDiffuse   = vec4(1.0, 0.8, 0.0, 1.0);
 var spotLightPosition   = vec4(0.0, 0.0, 9.0, 1.0 );
 var spotLightAmbient    = vec4(0.2, 0.2, 0.2, 1.0 );
 var spotLightDiffuse    = vec4(1.0, 1.0, 1.0, 1.0 );
-var spotLightDirection  = vec4(0.0, 0.0, 0.0, 1.0);
+var spotLightDirection  = vec4(0.0, 0.0, 1.0, 1.0);
 var spotCutOff = 0.95;
 
 var ambientProduct; 
@@ -142,7 +142,6 @@ var vertices = [
 ];
 
 var vertexColors = [
-  vec4(0.0, 0.0, 0.0, 1.0),  // black
   vec4(1.0, 0.0, 0.0, 1.0),  // red
   vec4(1.0, 1.0, 0.0, 1.0),  // yellow
   vec4(0.0, 1.0, 0.0, 1.0),  // green
@@ -162,21 +161,16 @@ function configureTexture( image ) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,
                     gl.NEAREST_MIPMAP_LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
   gl.uniform1i(gl.getUniformLocation(program, "uTextureMap"), 0);
 }
 
 function quad(a, b, c, d) {
-  var color;
-  if (true) { //a >= vertexColors.length
-    color = vec4(Math.random(), Math.random(), Math.random(), 1.0);   // test
-    // color = vec4(1.0, 0.0, 1.0, 1.0);  // 
-  } else {
-    color = vertexColors[a];
-  }
+  var color = vec4(Math.random(), Math.random(), Math.random(), 1.0);
 
   var t1 = subtract(vertices[b], vertices[a]);
-  var t2 = subtract(vertices[c], vertices[b]);
+  var t2 = subtract(vertices[c], vertices[a]);
   var normal = cross(t1, t2);
   normal = vec3(normal);
 
@@ -212,30 +206,24 @@ function quad(a, b, c, d) {
 }
 
 function colorCube() {
-  // quad(1, 0, 3, 2);
   //Right
   quad(2, 3, 7, 11);
   quad(7, 6, 15, 11);
 
-  // quad(3, 0, 4, 7);  
   //Bottom
   quad(0, 20, 21, 3);
   quad(3, 21, 24, 7);
   quad(7, 24, 23, 4);
   quad(4, 23, 20, 0);
 
-  // quad(6, 5, 1, 2);
   //Top-up face
   quad(1, 2, 11, 8);
   quad(6, 5, 12, 15);
-  // quad(1, 8, 12, 5);
-  // quad(2, 6, 15, 11);
 
   //Back
   quad(4, 5, 6, 7);
 
   //Left
-  // quad(4, 5, 12, 8);
   quad(4, 8, 12, 5);
   quad(0, 1, 8, 4);
 
@@ -312,9 +300,6 @@ function buttonHandler() {
   };
 
   // sliders for light position
-  // document.getElementById("toggleLight").onclick = function (event) {
-  //   flagLight = !flagLight
-  // };
   document.getElementById("xLighSlider").oninput = function (event) {
     xLight = event.target.value;
   };
